@@ -7,7 +7,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.luminance
+import tk.glucodata.ui.LocalDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -125,6 +128,10 @@ fun JournalFloatingActionMenu(
     val menuProgress = menuReveal.value
     val menuScale = 0.86f + (0.14f * menuProgress)
 
+    val isDark = LocalDarkTheme.current ||
+        MaterialTheme.colorScheme.surface.luminance() < 0.5f ||
+        isSystemInDarkTheme()
+
     if (anchorFraction != null && (visible || menuProgress > 0.01f)) {
         BoxWithConstraints(modifier = modifier.fillMaxSize()) {
             val popupWidth = maxWidth
@@ -174,6 +181,7 @@ fun JournalFloatingActionMenu(
                     JournalFloatingActionMenuCard(
                         itemSpacing = menuItemSpacing.coerceAtMost(8.dp),
                         onTypeSelected = onTypeSelected,
+                        isDark = isDark,
                         modifier = Modifier
                             .offset {
                                 androidx.compose.ui.unit.IntOffset(
@@ -199,57 +207,66 @@ fun JournalFloatingActionMenu(
 fun JournalFloatingActionMenuCard(
     itemSpacing: Dp = 6.dp,
     onTypeSelected: (JournalEntryType) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDark: Boolean = LocalDarkTheme.current || MaterialTheme.colorScheme.surface.luminance() < 0.5f || isSystemInDarkTheme()
 ) {
+    val cardBackgroundColor = if (isDark) Color(0xF4141720) else Color(0xF8F8FAFC)
+    val cardBorderColor = if (isDark) Color(0x38FFFFFF) else Color(0x22000000)
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        color = Color(0xF4141720),
-        border = BorderStroke(1.dp, Color(0x38FFFFFF)),
-        shadowElevation = 10.dp,
-        tonalElevation = 8.dp
+        color = cardBackgroundColor,
+        border = BorderStroke(1.dp, cardBorderColor),
+        shadowElevation = if (isDark) 10.dp else 6.dp,
+        tonalElevation = if (isDark) 8.dp else 3.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(itemSpacing)
         ) {
-            // Riga 1: Insulina e Cibo (disposizione su 2 colonne)
+            // Riga 1: Attività (sinistra) e Cibo (destra)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(itemSpacing)
             ) {
                 JournalPopupActionButton(
-                    actionType = JournalEntryType.INSULIN,
-                    onClick = { onTypeSelected(JournalEntryType.INSULIN) },
-                    modifier = Modifier.weight(1f)
+                    actionType = JournalEntryType.ACTIVITY,
+                    onClick = { onTypeSelected(JournalEntryType.ACTIVITY) },
+                    modifier = Modifier.weight(1f),
+                    isDark = isDark
                 )
                 JournalPopupActionButton(
                     actionType = JournalEntryType.CARBS,
                     onClick = { onTypeSelected(JournalEntryType.CARBS) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    isDark = isDark
                 )
             }
-            // Riga 2: Glicemia e Attività (disposizione su 2 colonne)
+            // Riga 2: Nota (sinistra) e Glicemia (destra)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(itemSpacing)
             ) {
                 JournalPopupActionButton(
-                    actionType = JournalEntryType.FINGERSTICK,
-                    onClick = { onTypeSelected(JournalEntryType.FINGERSTICK) },
-                    modifier = Modifier.weight(1f)
+                    actionType = JournalEntryType.NOTE,
+                    onClick = { onTypeSelected(JournalEntryType.NOTE) },
+                    modifier = Modifier.weight(1f),
+                    isDark = isDark
                 )
                 JournalPopupActionButton(
-                    actionType = JournalEntryType.ACTIVITY,
-                    onClick = { onTypeSelected(JournalEntryType.ACTIVITY) },
-                    modifier = Modifier.weight(1f)
+                    actionType = JournalEntryType.FINGERSTICK,
+                    onClick = { onTypeSelected(JournalEntryType.FINGERSTICK) },
+                    modifier = Modifier.weight(1f),
+                    isDark = isDark
                 )
             }
-            // Riga 3: Nota (estesa su entrambe le colonne)
+            // Riga 3: Insulina (a tutta larghezza)
             JournalPopupActionButton(
-                actionType = JournalEntryType.NOTE,
-                onClick = { onTypeSelected(JournalEntryType.NOTE) },
-                modifier = Modifier.fillMaxWidth()
+                actionType = JournalEntryType.INSULIN,
+                onClick = { onTypeSelected(JournalEntryType.INSULIN) },
+                modifier = Modifier.fillMaxWidth(),
+                isDark = isDark
             )
         }
     }
@@ -259,12 +276,25 @@ fun JournalFloatingActionMenuCard(
 fun JournalPopupActionButton(
     actionType: JournalEntryType,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDark: Boolean = LocalDarkTheme.current || MaterialTheme.colorScheme.surface.luminance() < 0.5f || isSystemInDarkTheme()
 ) {
     val view = LocalView.current
     val actionTint = journalTypeColor(actionType)
-    val containerColor = Color(0xFF222633)
-    val borderColor = actionTint.copy(alpha = 0.42f)
+    
+    // Tema scuro: sfondo scuro a contrasto (#222633) con testo chiaro
+    // Tema chiaro: colori più tenui (tonalità sfumata) e testo nero
+    val containerColor = if (isDark) {
+        Color(0xFF222633)
+    } else {
+        androidx.compose.ui.graphics.lerp(Color(0xFFF1F4F9), actionTint, 0.12f)
+    }
+    val borderColor = if (isDark) {
+        actionTint.copy(alpha = 0.42f)
+    } else {
+        actionTint.copy(alpha = 0.35f)
+    }
+    val textColor = if (isDark) Color(0xFFF0F3F8) else Color(0xFF0F172A)
 
     Surface(
         onClick = {
@@ -274,7 +304,7 @@ fun JournalPopupActionButton(
         shape = RoundedCornerShape(12.dp),
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
-        tonalElevation = 2.dp,
+        tonalElevation = if (isDark) 2.dp else 1.dp,
         modifier = modifier.height(38.dp)
     ) {
         Row(
@@ -288,13 +318,13 @@ fun JournalPopupActionButton(
                 imageVector = actionType.journalActionIcon(),
                 contentDescription = null,
                 tint = actionTint,
-                modifier = Modifier.size(17.dp)
+                modifier = Modifier.size(21.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = actionType.journalActionLabel(),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Color(0xFFF0F3F8),
+                color = textColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -455,7 +485,7 @@ private fun JournalActionFab(
         Icon(
             imageVector = actionType.journalActionIcon(),
             contentDescription = label,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(26.dp)
         )
     }
 }
@@ -466,7 +496,8 @@ private fun JournalFloatingActionMenuCardPreviewDark() {
     MaterialTheme {
         Box(modifier = Modifier.padding(16.dp)) {
             JournalFloatingActionMenuCard(
-                onTypeSelected = {}
+                onTypeSelected = {},
+                isDark = true
             )
         }
     }
@@ -478,9 +509,33 @@ private fun JournalFloatingActionMenuCardPreviewLight() {
     MaterialTheme {
         Box(modifier = Modifier.padding(16.dp)) {
             JournalFloatingActionMenuCard(
-                onTypeSelected = {}
+                onTypeSelected = {},
+                isDark = false
             )
         }
     }
 }
+
+internal fun generateDebugSampleGlucoseHistory(unit: String): List<tk.glucodata.ui.GlucosePoint> {
+    val now = System.currentTimeMillis()
+    val isMmol = tk.glucodata.ui.util.GlucoseFormatter.isMmol(unit)
+    val points = mutableListOf<tk.glucodata.ui.GlucosePoint>()
+    for (i in 72 downTo 0) {
+        val t = now - i * 5 * 60 * 1000L
+        val phase = (i.toDouble() / 18.0) * Math.PI
+        val baseMg = 125.0 + 35.0 * kotlin.math.sin(phase) + 12.0 * kotlin.math.cos(phase * 2.3)
+        val value = if (isMmol) tk.glucodata.ui.util.GlucoseFormatter.mgToMmol(baseMg.toFloat()) else baseMg.toFloat()
+        val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(t))
+        points.add(
+            tk.glucodata.ui.GlucosePoint(
+                value = value,
+                time = timeStr,
+                timestamp = t,
+                rawValue = value
+            )
+        )
+    }
+    return points
+}
+
 
